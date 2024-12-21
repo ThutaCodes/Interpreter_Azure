@@ -21,15 +21,10 @@ def on_canceled(event):
     # Optionally, stop recognition on error
     event.recognizer.stop_continuous_recognition()
 
-def speak_to_microphone(api_key, region, device="VirtualMic.monitor"):
-    """
-    Captures audio from the specified device and performs speech recognition using Azure Cognitive Services.
-
-    Parameters:
-        api_key (str): Azure Speech Service API key.
-        region (str): Azure Speech Service region.
-        device (str): The PulseAudio device to capture audio from (default is "VirtualMic.monitor").
-    """
+def speak_to_microphone(api_key, region):
+    
+    # Captures audio from the specified PulseAudio device and performs speech recognition using Azure Cognitive Services.
+    
     # Set up the speech configuration
     speech_config = speechsdk.SpeechConfig(subscription=api_key, region=region)
     speech_config.speech_recognition_language = "en-US"
@@ -58,14 +53,21 @@ def speak_to_microphone(api_key, region, device="VirtualMic.monitor"):
 
     print("Speak into the microphone. Say 'Stop session' to end.")
 
-    # Start capturing audio using parec
+    # Start capturing audio using parec from PulseAudio
+    # You need to enter your device name in the --device parameter" as shown below. Most Linux systems use "alsa_input.pci-0000_00_1f.3.analog-stereo" for the built-in microphone.
+    '''
+    You can ensure the device name by running the following command in the terminal:
+    Check active audio sources (microphone input) in PulseAudio:
+    pactl list sources
+    '''
     command = [
-        "parec", "--device={}".format(device),
-        "--format=s16le", "--rate=16000", "--channels=1"
+    "parec", "--device=alsa_input.pci-0000_00_1f.3.analog-stereo", 
+    "--format=s16le", "--rate=16000", "--channels=1"
     ]
 
     process = None
     try:
+        # Start the process to capture audio from PulseAudio
         process = subprocess.Popen(command, stdout=subprocess.PIPE, bufsize=4096)
 
         # Start continuous recognition
@@ -85,7 +87,6 @@ def speak_to_microphone(api_key, region, device="VirtualMic.monitor"):
     except Exception as e:
         print(f"An error occurred: {e}")
     finally:
-        # Ensure cleanup
         if process:
             print("Terminating audio capture process.")
             process.terminate()
