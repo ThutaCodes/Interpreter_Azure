@@ -1,7 +1,7 @@
 import azure.cognitiveservices.speech as speechsdk
 import subprocess
+from dotenv import load_dotenv
 import os
-import signal
 
 def on_recognizing(event):
     print(f"Recognizing: {event.result.text}")
@@ -93,8 +93,9 @@ def speak_to_microphone(api_key, region, device="VirtualMic.monitor"):
         speech_recognizer.stop_continuous_recognition()
 
 if __name__ == "__main__":
-    api_key = "3dqAtvOtURMp6F0WWIbCdBOji0Qw5TnDEkPQLWI4gRuEuHZRk7Z8JQQJ99ALACYeBjFXJ3w3AAAYACOGqx4y"
-    region = "eastus" 
+    load_dotenv()
+    api_key = os.getenv('API_KEY')
+    region = os.getenv('REGION')
 
     if not api_key or not region:
         print("Error: Please set the AZURE_SPEECH_API_KEY and AZURE_SPEECH_REGION environment variables.")
