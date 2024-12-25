@@ -8,12 +8,10 @@ import json
 import asyncio
 import websockets
 
-# Load environment variables
 load_dotenv()
-
 # Azure Speech and Translator API configuration
-SPEECH_API_KEY = os.getenv('API_KEY')
-SPEECH_REGION = os.getenv('REGION')
+SPEECH_API_KEY = os.getenv('API_KEY_SPEECH')
+SPEECH_REGION = "eastus"
 TRANSLATOR_API_KEY = os.getenv('API_KEY_TRANSLATOR')
 TRANSLATOR_ENDPOINT = "https://api.cognitive.microsofttranslator.com"
 TRANSLATOR_REGION = "eastus"
