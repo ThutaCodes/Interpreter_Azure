@@ -121,7 +121,6 @@ async def websocket_handler(websocket, path):
     try:
         async for message in websocket:
             print(f"Received message from client: {message}")
-            # Update target language dynamically if client sends a new language
             global TARGET_LANGUAGE
             TARGET_LANGUAGE = message.strip()
             print(f"Target language set to: {TARGET_LANGUAGE}")
@@ -188,8 +187,6 @@ def recognize_and_translate():
 async def main():
     websocket_server = websockets.serve(websocket_handler, "localhost", 8765)
     print("WebSocket server started on ws://localhost:8765")
-
-    # Run the WebSocket server and the speech recognition loop concurrently
     await asyncio.gather(websocket_server, asyncio.to_thread(recognize_and_translate))
 
 if __name__ == "__main__":
