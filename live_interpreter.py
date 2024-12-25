@@ -23,7 +23,13 @@ def choose_language():
         "2": "fr",       # French
         "3": "es",       # Spanish
         "4": "de",       # German
-        "5": "it"        # Italian
+        "5": "it" ,       # Italian
+        "6": "ja" ,       # Japanese
+        "7": "ko" ,       # Korean
+        "8": "th" ,       # Thai
+        "9": "hi" ,       # Hindi
+        "10": "ar" ,      # Arabic
+        "11": "ur" ,      # Urdu
     }
     
     print("Choose your language:")
@@ -32,6 +38,12 @@ def choose_language():
     print("3. Spanish")
     print("4. German")
     print("5. Italian")
+    print("6. Japanese")
+    print("7. Korean")
+    print("8. Thai")
+    print("9. Hindi")
+    print("10. Arabic")
+    print("11. Urdu")
     
     choice = input("Enter the number of your choice: ")
     return languages.get(choice, "fr")
