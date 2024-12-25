@@ -92,22 +92,26 @@ def synthesize_speech(text, output_filename):
     Convert translated text to speech using Azure TTS.
     """
     speech_config = speechsdk.SpeechConfig(subscription=SPEECH_API_KEY, region=SPEECH_REGION)
-    audio_config = speechsdk.audio.AudioOutputConfig(filename=output_filename)
+    audio_config = speechsdk.audio.AudioOutputConfig(use_default_speaker=False)
 
     speech_synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config, audio_config=audio_config)
     result = speech_synthesizer.speak_text_async(text).get()
 
     if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
         print(f"Speech synthesized to {output_filename}")
+        return result.audio.data
     else:
         print("Speech synthesis failed:", result.reason)
+        return None
 
-async def broadcast_message(message):
+async def broadcast_message(message, audio_data=None):
     """
     Send the translated text or audio link to all connected WebSocket clients.
     """
     if connected_clients:
         await asyncio.wait([client.send(message) for client in connected_clients])
+        if audio_data:
+            await asyncio.wait([client.send(audio_data) for client in connected_clients])
 
 async def websocket_handler(websocket, path):
     """
@@ -146,16 +150,11 @@ def recognize_and_translate():
             translation = translate_text(recognized_text, TARGET_LANGUAGE)
             if translation:
                 print(f"Translation ({TARGET_LANGUAGE}): {translation}")
-
-                # Synthesize the translated text to speech
-                audio_filename = "output.wav"
-                synthesize_speech(translation, audio_filename)
-
+                audio_data = synthesize_speech(translation)
                 # Broadcast the translation and audio filename to WebSocket clients
                 await broadcast_message(json.dumps({
-                    "text": translation,
-                    "audio": audio_filename
-                }))
+                    "text": translation
+                }), audio_data)
 
     speech_recognizer.recognized.connect(lambda event: asyncio.run(handle_recognized(event)))
     speech_recognizer.canceled.connect(on_canceled)
