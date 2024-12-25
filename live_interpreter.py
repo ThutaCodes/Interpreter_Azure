@@ -16,8 +16,26 @@ TRANSLATOR_API_KEY = os.getenv('API_KEY_TRANSLATOR')
 TRANSLATOR_ENDPOINT = "https://api.cognitive.microsofttranslator.com"
 TRANSLATOR_REGION = "eastus"
 
-# Default target language
-TARGET_LANGUAGE = "fr"  # Example: "zh-Hans" for Simplified Chinese, "fr" for French
+# Language selection
+def choose_language():
+    languages = {
+        "1": "zh-Hans",  # Simplified Chinese
+        "2": "fr",       # French
+        "3": "es",       # Spanish
+        "4": "de",       # German
+        "5": "it"        # Italian
+    }
+    
+    print("Choose your language:")
+    print("1. Chinese")
+    print("2. French")
+    print("3. Spanish")
+    print("4. German")
+    print("5. Italian")
+    
+    choice = input("Enter the number of your choice: ")
+    return languages.get(choice, "fr")
+TARGET_LANGUAGE = choose_language()
 
 # WebSocket clients
 connected_clients = set()
