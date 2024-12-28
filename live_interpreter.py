@@ -9,57 +9,31 @@ import asyncio
 import websockets
 
 load_dotenv()
-# Azure Speech and Translator API configuration
+
+# Azure API Keys and Configuration
 SPEECH_API_KEY = os.getenv('API_KEY_SPEECH')
 SPEECH_REGION = "eastus"
 TRANSLATOR_API_KEY = os.getenv('API_KEY_TRANSLATOR')
 TRANSLATOR_ENDPOINT = "https://api.cognitive.microsofttranslator.com"
 TRANSLATOR_REGION = "eastus"
 
-# Language selection
-def choose_language():
-    languages = {
-        "1": "zh-Hans",  # Simplified Chinese
-        "2": "fr",       # French
-        "3": "es",       # Spanish
-        "4": "de",       # German
-        "5": "it" ,       # Italian
-        "6": "ja" ,       # Japanese
-        "7": "ko" ,       # Korean
-        "8": "th" ,       # Thai
-        "9": "hi" ,       # Hindi
-        "10": "ar" ,      # Arabic
-        "11": "ur" ,      # Urdu
-    }
-    
-    print("Choose your language:")
-    print("1. Chinese")
-    print("2. French")
-    print("3. Spanish")
-    print("4. German")
-    print("5. Italian")
-    print("6. Japanese")
-    print("7. Korean")
-    print("8. Thai")
-    print("9. Hindi")
-    print("10. Arabic")
-    print("11. Urdu")
-    
-    choice = input("Enter the number of your choice: ")
-    return languages.get(choice, "fr")
-TARGET_LANGUAGE = choose_language()
+# WebSocket Clients
+connected_clients = {}  # Store {websocket: target_language}
 
-# WebSocket clients
-connected_clients = set()
-
-def on_canceled(event):
-    print(f"Speech Recognition canceled: {event.error_details}")
-    if event.reason == speechsdk.CancellationReason.Error:
-        print("Error details:", event.error_details)
+async def broadcast_message(message, sender=None):
+    """
+    Send the translated message to all connected clients based on their target language.
+    """
+    for websocket, target_language in connected_clients.items():
+        if websocket != sender:  # Avoid sending the message back to the sender
+            translated_message = translate_text(message, target_language)
+            if translated_message:
+                await websocket.send(json.dumps({"translation": translated_message}))
+                print(f"Broadcasted to {target_language}: {translated_message}")
 
 def translate_text(text, target_language):
     """
-    Translate the recognized text to the target language using Azure Translator API.
+    Translate text using Azure Translator API.
     """
     path = '/translate'
     constructed_url = TRANSLATOR_ENDPOINT + path
@@ -78,57 +52,40 @@ def translate_text(text, target_language):
     }
 
     body = [{'text': text}]
-
     response = requests.post(constructed_url, params=params, headers=headers, json=body)
+
     if response.status_code == 200:
-        translation = response.json()[0]['translations'][0]['text']
-        return translation
+        return response.json()[0]['translations'][0]['text']
     else:
         print("Translation API error:", response.status_code, response.text)
         return None
-
-def synthesize_speech(text):
-    """
-    Convert translated text to speech using Azure TTS.
-    """
-    speech_config = speechsdk.SpeechConfig(subscription=SPEECH_API_KEY, region=SPEECH_REGION)
-    audio_config = speechsdk.audio.AudioOutputConfig(use_default_speaker=False)
-
-    speech_synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config, audio_config=audio_config)
-    result = speech_synthesizer.speak_text_async(text).get()
-
-    if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
-        return result.audio.data
-    else:
-        print("Speech synthesis failed:", result.reason)
-        return None
-
-async def broadcast_message(message, audio_data=None):
-    """
-    Send the translated text or audio link to all connected WebSocket clients.
-    """
-    if connected_clients:
-        await asyncio.wait([client.send(message) for client in connected_clients])
-        if audio_data:
-            await asyncio.wait([client.send(audio_data) for client in connected_clients])
 
 async def websocket_handler(websocket):
     """
     Handle WebSocket connections from clients.
     """
-    connected_clients.add(websocket)
+    print("New client connected.")
+    await websocket.send(json.dumps({"message": "Welcome! Set your language using the 'language' command."}))
+
     try:
         async for message in websocket:
-            print(f"Received message from client: {message}")
-            global TARGET_LANGUAGE
-            TARGET_LANGUAGE = message.strip()
-            print(f"Target language set to: {TARGET_LANGUAGE}")
+            data = json.loads(message)
+            if "language" in data:
+                connected_clients[websocket] = data["language"]
+                print(f"Client set language to: {data['language']}")
+                await websocket.send(json.dumps({"message": f"Language set to {data['language']}"}))
+            elif "text" in data:
+                print(f"Received text from client: {data['text']}")
+                await broadcast_message(data["text"], sender=websocket)
+    except websockets.exceptions.ConnectionClosed:
+        print("Client disconnected.")
     finally:
-        connected_clients.remove(websocket)
-
-def recognize_and_translate():
+        connected_clients.pop(websocket, None)
+        print("Client connection closed.")
+        
+def recognize_speech():
     """
-    Recognize speech, translate it, and broadcast via WebSocket.
+    Recognize speech and broadcast text.
     """
     speech_config = speechsdk.SpeechConfig(subscription=SPEECH_API_KEY, region=SPEECH_REGION)
     speech_config.speech_recognition_language = "en-US"
@@ -137,36 +94,24 @@ def recognize_and_translate():
     audio_config = speechsdk.audio.AudioConfig(stream=push_stream)
     speech_recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
 
-    async def handle_recognized(event):
+    def on_recognized(event):
         """
-        Handle recognized speech, translate it, synthesize audio, and broadcast the result.
+        Recognized speech handler.
         """
         recognized_text = event.result.text
-        print(f"Recognized: {recognized_text}")
+        print(f"Recognized text: {recognized_text}")
+        asyncio.run(broadcast_message(recognized_text))
 
-        if recognized_text:
-            translation = translate_text(recognized_text, TARGET_LANGUAGE)
-            if translation:
-                print(f"Translation ({TARGET_LANGUAGE}): {translation}")
-                audio_data = synthesize_speech(translation)
-                # Broadcast the translation and audio filename to WebSocket clients
-                await broadcast_message(json.dumps({
-                    "text": translation
-                }), audio_data)
-
-    speech_recognizer.recognized.connect(lambda event: asyncio.run(handle_recognized(event)))
-    speech_recognizer.canceled.connect(on_canceled)
+    speech_recognizer.recognized.connect(on_recognized)
 
     command = [
         "parec", "--device=alsa_input.pci-0000_00_1f.3.analog-stereo",
         "--format=s16le", "--rate=16000", "--channels=1"
     ]
 
-    process = None
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, bufsize=4096)
     try:
-        process = subprocess.Popen(command, stdout=subprocess.PIPE, bufsize=4096)
         speech_recognizer.start_continuous_recognition()
-
         print("Listening for speech. Speak into the microphone.")
 
         while True:
@@ -174,19 +119,18 @@ def recognize_and_translate():
             if not audio_data:
                 break
             push_stream.write(audio_data)
-
     except KeyboardInterrupt:
         print("Session interrupted.")
     finally:
-        if process:
-            process.terminate()
+        process.terminate()
         push_stream.close()
         speech_recognizer.stop_continuous_recognition()
 
 async def main():
     websocket_server = websockets.serve(websocket_handler, "localhost", 8765)
     print("WebSocket server started on ws://localhost:8765")
-    await asyncio.gather(websocket_server, asyncio.to_thread(recognize_and_translate))
+
+    await asyncio.gather(websocket_server, asyncio.to_thread(recognize_speech))
 
 if __name__ == "__main__":
     asyncio.run(main())
