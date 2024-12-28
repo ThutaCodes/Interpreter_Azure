@@ -87,7 +87,7 @@ def translate_text(text, target_language):
         print("Translation API error:", response.status_code, response.text)
         return None
 
-def synthesize_speech(text, output_filename):
+def synthesize_speech(text):
     """
     Convert translated text to speech using Azure TTS.
     """
@@ -98,7 +98,6 @@ def synthesize_speech(text, output_filename):
     result = speech_synthesizer.speak_text_async(text).get()
 
     if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
-        print(f"Speech synthesized to {output_filename}")
         return result.audio.data
     else:
         print("Speech synthesis failed:", result.reason)
@@ -113,7 +112,7 @@ async def broadcast_message(message, audio_data=None):
         if audio_data:
             await asyncio.wait([client.send(audio_data) for client in connected_clients])
 
-async def websocket_handler(websocket, path):
+async def websocket_handler(websocket):
     """
     Handle WebSocket connections from clients.
     """
