@@ -65,7 +65,7 @@ async def websocket_handler(websocket):
     Handle WebSocket connections from clients.
     """
     print("New client connected.")
-    await websocket.send(json.dumps({"message": "Welcome! Set your language using the 'language' command."}))
+    await websocket.send(json.dumps({"message": "Welcome to the live interpreter!"}))
 
     try:
         async for message in websocket:
@@ -82,7 +82,7 @@ async def websocket_handler(websocket):
     finally:
         connected_clients.pop(websocket, None)
         print("Client connection closed.")
-        
+
 def recognize_speech():
     """
     Recognize speech and broadcast text.
