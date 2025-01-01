@@ -9,19 +9,37 @@ socket.addEventListener("open", () => {
   console.log("WebSocket connected.");
 });
 
-socket.addEventListener("message", (event) => {
-  console.log("Message from server:", event.data); // Log the incoming message
+socket.addEventListener("message", async (event) => {
+  console.log("Message from server:", event.data);
 
   const data = JSON.parse(event.data);
 
   if (data.translation) {
-    // If the message contains a translation, append it to the UI
+    // Display the translated text
     outputDiv.textContent += `\n${data.translation}`;
-  } else if (data.message) {
-    // For general server messages
+  }
+
+  if (data.audio) {
+    // Handle audio data
+    const audioData = Uint8Array.from(atob(data.audio), (c) => c.charCodeAt(0));
+
+    try {
+      const audioContext = new (window.AudioContext ||
+        window.webkitAudioContext)();
+      const audioBuffer = await audioContext.decodeAudioData(audioData.buffer);
+      const source = audioContext.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(audioContext.destination);
+      source.start(0); // Play the audio
+      console.log("Audio playback started.");
+    } catch (error) {
+      console.error("Error decoding or playing audio:", error);
+    }
+  }
+
+  if (data.message) {
+    // Display general messages from the server
     outputDiv.textContent += `\n${data.message}`;
-  } else {
-    console.log("Unrecognized message format:", data);
   }
 });
 
@@ -35,7 +53,7 @@ socket.addEventListener("error", (error) => {
 
 setLanguageButton.addEventListener("click", () => {
   const selectedLanguage = languageSelector.value;
-  socket.send(JSON.stringify({ language: selectedLanguage })); // Notify server of selected language
+  socket.send(JSON.stringify({ language: selectedLanguage })); 
   console.log(`Language set to ${selectedLanguage}`);
   outputDiv.textContent += `\nLanguage set to ${selectedLanguage}`;
 });

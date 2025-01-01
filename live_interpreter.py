@@ -7,6 +7,7 @@ import uuid
 import json
 import asyncio
 import websockets
+import base64
 
 load_dotenv()
 
@@ -22,14 +23,21 @@ connected_clients = {}  # Store {websocket: target_language}
 
 async def broadcast_message(message, sender=None):
     """
-    Send the translated message to all connected clients based on their target language.
+    Send the translated message and synthesized audio to all connected clients based on their target language.
     """
     for websocket, target_language in connected_clients.items():
         if websocket != sender:  # Avoid sending the message back to the sender
             translated_message = translate_text(message, target_language)
             if translated_message:
-                await websocket.send(json.dumps({"translation": translated_message}))
-                print(f"Broadcasted to {target_language}: {translated_message}")
+                # Generate speech synthesis for the translated message
+                audio_data = synthesize_speech(translated_message, target_language)
+                if audio_data:
+                    # Send translated text and audio to the client
+                    await websocket.send(json.dumps({
+                        "translation": translated_message,
+                        "audio": base64.b64encode(audio_data).decode('utf-8')  # Send audio as base64
+                    }))
+                    print(f"Broadcasted to {target_language}: {translated_message}")
 
 def translate_text(text, target_language):
     """
@@ -58,6 +66,39 @@ def translate_text(text, target_language):
         return response.json()[0]['translations'][0]['text']
     else:
         print("Translation API error:", response.status_code, response.text)
+        return None
+
+def synthesize_speech(text, language):
+    """
+    Synthesize speech using Azure Speech SDK.
+    """
+    speech_config = speechsdk.SpeechConfig(subscription=SPEECH_API_KEY, region=SPEECH_REGION)
+    language_voice_map = {
+        "en": "en-US-AriaNeural",
+        "es": "es-ES-ElviraNeural",
+        "fr": "fr-FR-DeniseNeural",
+        "de": "de-DE-KatjaNeural",
+        "it": "it-IT-ElsaNeural",
+        "ja": "ja-JP-AyumiNeural",
+        "ko": "ko-KR-SunHiNeural",
+        "th": "th-TH-PremwadeeNeural",
+        "zh-Hans": "zh-CN-XiaoxiaoNeural",
+        "hi": "hi-IN-SwaraNeural",
+        "ar": "ar-SA-ZariyahNeural",
+        "ur": "ur-PK-AsadNeural",
+    }
+
+    voice = language_voice_map.get(language, "en-US-AriaNeural")  # Default to English voice
+    speech_config.speech_synthesis_voice_name = voice
+
+    synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config, audio_config=None)
+    result = synthesizer.speak_text_async(text).get()
+
+    if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
+        print(f"Speech synthesized for: {text}")
+        return result.audio_data
+    else:
+        print(f"Speech synthesis failed: {result.reason}")
         return None
 
 async def websocket_handler(websocket):
