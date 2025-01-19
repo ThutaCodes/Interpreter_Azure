@@ -2,6 +2,9 @@ const serverUrl = "ws://localhost:8765";
 const socket = new WebSocket(serverUrl);
 
 const languageSelector = document.getElementById("languageSelector");
+const recognitionLanguageSelector = document.getElementById(
+  "recognitionLanguageSelector"
+);
 const setLanguageButton = document.getElementById("setLanguage");
 const outputDiv = document.getElementById("output");
 
@@ -53,7 +56,15 @@ socket.addEventListener("error", (error) => {
 
 setLanguageButton.addEventListener("click", () => {
   const selectedLanguage = languageSelector.value;
-  socket.send(JSON.stringify({ language: selectedLanguage })); 
-  console.log(`Language set to ${selectedLanguage}`);
-  outputDiv.textContent += `\nLanguage set to ${selectedLanguage}`;
+  const selectedRecognitionLanguage = recognitionLanguageSelector.value;
+  socket.send(
+    JSON.stringify({
+      language: selectedLanguage,
+      recognition_language: selectedRecognitionLanguage,
+    })
+  );
+  console.log(
+    `Language set to ${selectedLanguage} and recognition language set to ${selectedRecognitionLanguage}`
+  );
+  outputDiv.textContent += `\nLanguage set to ${selectedLanguage} and recognition language set to ${selectedRecognitionLanguage}`;
 });

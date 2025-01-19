@@ -19,15 +19,15 @@ TRANSLATOR_ENDPOINT = "https://api.cognitive.microsofttranslator.com"
 TRANSLATOR_REGION = "eastus"
 
 # WebSocket Clients
-connected_clients = {}  # Store {websocket: target_language}
+connected_clients = {}  # Store {websocket: (target_language, recognition_language)}
 
 async def broadcast_message(message, sender=None):
     """
     Send the translated message and synthesized audio to all connected clients based on their target language.
     """
-    for websocket, target_language in connected_clients.items():
+    for websocket, (target_language, recognition_language) in connected_clients.items():
         if websocket != sender:  # Avoid sending the message back to the sender
-            translated_message = translate_text(message, target_language)
+            translated_message = translate_text(message, recognition_language, target_language)
             if translated_message:
                 # Generate speech synthesis for the translated message
                 audio_data = synthesize_speech(translated_message, target_language)
@@ -39,7 +39,7 @@ async def broadcast_message(message, sender=None):
                     }))
                     print(f"Broadcasted to {target_language}: {translated_message}")
 
-def translate_text(text, target_language):
+def translate_text(text, source_language, target_language):
     """
     Translate text using Azure Translator API.
     """
@@ -48,7 +48,7 @@ def translate_text(text, target_language):
 
     params = {
         "api-version": "3.0",
-        "from": "en",
+        "from": source_language,
         "to": [target_language]
     }
 
@@ -67,7 +67,7 @@ def translate_text(text, target_language):
     else:
         print("Translation API error:", response.status_code, response.text)
         return None
-
+    
 def synthesize_speech(text, language):
     """
     Synthesize speech using Azure Speech SDK.
@@ -112,9 +112,11 @@ async def websocket_handler(websocket):
         async for message in websocket:
             data = json.loads(message)
             if "language" in data:
-                connected_clients[websocket] = data["language"]
-                print(f"Client set language to: {data['language']}")
-                await websocket.send(json.dumps({"message": f"Language set to {data['language']}"}))
+                target_language = data["language"]
+                recognition_language = data.get("recognition_language", "en-US")
+                connected_clients[websocket] = (target_language, recognition_language)
+                print(f"Client set target language to: {target_language} and recognition language to: {recognition_language}")
+                await websocket.send(json.dumps({"message": f"Language set to {target_language}"}))
             elif "text" in data:
                 print(f"Received text from client: {data['text']}")
                 await broadcast_message(data["text"], sender=websocket)
@@ -129,7 +131,6 @@ def recognize_speech():
     Recognize speech and broadcast text.
     """
     speech_config = speechsdk.SpeechConfig(subscription=SPEECH_API_KEY, region=SPEECH_REGION)
-    speech_config.speech_recognition_language = "en-US"
 
     push_stream = speechsdk.audio.PushAudioInputStream()
     audio_config = speechsdk.audio.AudioConfig(stream=push_stream)
