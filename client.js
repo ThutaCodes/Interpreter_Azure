@@ -1,10 +1,7 @@
 const serverUrl = "ws://localhost:8765";
 const socket = new WebSocket(serverUrl);
 
-const inputLanguageSelector = document.getElementById("inputLanguageSelector");
-const outputLanguageSelector = document.getElementById(
-  "outputLanguageSelector"
-);
+const languageSelector = document.getElementById("languageSelector");
 const setLanguageButton = document.getElementById("setLanguage");
 const outputDiv = document.getElementById("output");
 
@@ -18,21 +15,22 @@ socket.addEventListener("message", async (event) => {
   const data = JSON.parse(event.data);
 
   if (data.translation) {
-    outputDiv.textContent += `\nTranslation: ${data.translation}`;
+    // Display the translated text
+    outputDiv.textContent += `\n${data.translation}`;
   }
 
   if (data.audio) {
+    // Handle audio data
+    const audioData = Uint8Array.from(atob(data.audio), (c) => c.charCodeAt(0));
+
     try {
-      const audioData = Uint8Array.from(atob(data.audio), (c) =>
-        c.charCodeAt(0)
-      );
       const audioContext = new (window.AudioContext ||
         window.webkitAudioContext)();
       const audioBuffer = await audioContext.decodeAudioData(audioData.buffer);
       const source = audioContext.createBufferSource();
       source.buffer = audioBuffer;
       source.connect(audioContext.destination);
-      source.start(0);
+      source.start(0); // Play the audio
       console.log("Audio playback started.");
     } catch (error) {
       console.error("Error decoding or playing audio:", error);
@@ -40,7 +38,8 @@ socket.addEventListener("message", async (event) => {
   }
 
   if (data.message) {
-    outputDiv.textContent += `\nMessage: ${data.message}`;
+    // Display general messages from the server
+    outputDiv.textContent += `\n${data.message}`;
   }
 });
 
@@ -53,17 +52,8 @@ socket.addEventListener("error", (error) => {
 });
 
 setLanguageButton.addEventListener("click", () => {
-  const inputLanguage = inputLanguageSelector.value;
-  const outputLanguage = outputLanguageSelector.value;
-
-  socket.send(
-    JSON.stringify({
-      language: outputLanguage,
-      source_language: inputLanguage,
-    })
-  );
-  console.log(
-    `Output language set to ${outputLanguage}, source language set to ${inputLanguage}`
-  );
-  outputDiv.textContent += `\nOutput language set to ${outputLanguage}, source language set to ${inputLanguage}`;
+  const selectedLanguage = languageSelector.value;
+  socket.send(JSON.stringify({ language: selectedLanguage }));
+  console.log(`Language set to ${selectedLanguage}`);
+  outputDiv.textContent += `\nLanguage set to ${selectedLanguage}`;
 });
